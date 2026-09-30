@@ -1,6 +1,7 @@
 import { users } from '../mock-data/seed';
 import { roles } from '../mock-data/roles';
 import { permissionGrants } from '../mock-data/permissions';
+import { accountActivity } from '../mock-data/content';
 import { endpoint, type ApiResult } from './mock-api';
 import type { User } from '../mock-data/types';
 
@@ -18,11 +19,15 @@ function persist(session: MockSession | null) {
 /** Password is a shared demonstration credential only; this mock hash is not cryptographic. */
 export async function login(email: string, password: string): Promise<ApiResult<AuthPayload>> {
   return endpoint(() => {
-    const user = users.find((candidate) => candidate.email.toLowerCase() === email.trim().toLowerCase() && candidate.passwordHash === `mock-sha256:${password}` && candidate.status === 'active');
-    if (!user) throw new Error('Invalid email or password');
+    const account = users.find((candidate) => candidate.email.toLowerCase() === email.trim().toLowerCase());
+    if (!account || account.passwordHash !== `mock-sha256:${password}`) throw new Error('Invalid email or password');
+    if (account.status !== 'active') throw new Error(account.status==='suspended'?'This account is suspended. Contact your organization administrator.':account.status==='deactivated'?'This account has been deactivated. Contact support to restore access.':'This account invitation has not been activated yet.');
+    const user=account;
     const issuedAt = new Date();
+    user.lastLoginAt=issuedAt.toISOString();
     const session: MockSession = { token: token(), userId: user.id, issuedAt: issuedAt.toISOString(), expiresAt: new Date(issuedAt.getTime() + 8 * 60 * 60 * 1000).toISOString() };
     persist(session);
+    accountActivity.unshift({id:`activity-${Date.now().toString(36)}`,userId:user.id,actorId:user.id,event:'login',details:'Successful sign-in.',createdAt:issuedAt.toISOString()});
     return { user: safeUser(user), roles: roles.filter((role) => user.roleIds.includes(role.id)), permissions: permissionGrants.filter((grant) => user.roleIds.includes(grant.roleId)), session };
   }, { errorRate: 0 });
 }

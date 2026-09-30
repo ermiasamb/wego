@@ -9,13 +9,16 @@ const full: Action[] = ['view', 'create', 'edit', 'delete', 'manage'];
 const manager: Action[] = ['view', 'create', 'edit', 'delete'];
 const readExport: Action[] = ['view', 'export'];
 
-add('platform-admin', ['organizations','users','programs','cohorts','participants','attendance','expenses','reports','blog','events','certificates','notifications','assessments','evaluations','venues','curriculum'], ['view','create','edit','delete','approve','export','publish','manage'], 'platform');
+add('platform-admin', ['person_financial','person_identity','person_demographics','person_emergency','organizations','users','roles','facilitators','programs','cohorts','participants','attendance','expenses','reports','blog','events','certificates','notifications','assessments','evaluations','venues','curriculum'], ['view','create','edit','delete','approve','export','publish','manage'], 'platform');
 add('org-admin', ['organizations'], ['view','edit','manage'], 'organization');
 add('org-admin', ['users','programs','cohorts','participants','attendance','expenses','certificates','blog','events','notifications','assessments','evaluations','venues','curriculum'], full, 'organization');
 add('org-admin', ['reports'], ['view','export'], 'organization');
+add('org-admin', ['roles'], ['view','create','edit','delete','manage'], 'organization');
 add('program-manager', ['programs','cohorts','participants','attendance','certificates','assessments','evaluations','curriculum','venues'], manager, 'organization');
 add('program-manager', ['expenses'], ['view','create','edit'], 'organization');
 add('program-manager', ['reports'], readExport, 'organization');
+add('program-manager', ['facilitators'], ['view'], 'organization');
+add('org-admin', ['facilitators'], full, 'organization');
 add('program-manager', ['blog','events'], ['view','create','edit'], 'organization');
 add('facilitator', ['programs','cohorts','reports'], read, 'assigned');
 add('facilitator', ['cohorts'], ['edit'], 'assigned');
@@ -41,18 +44,25 @@ add('partner-viewer', ['programs','cohorts','participants','expenses','reports',
 add('content-editor', ['blog','events'], ['view','create','edit','delete','publish'], 'organization');
 add('content-editor', ['programs','cohorts'], read, 'public');
 add('content-editor', ['notifications'], read, 'self');
+// Field-level person data grants; visibleFields() is the sole policy evaluator.
+add('org-admin', ['person_identity','person_demographics','person_emergency'], read, 'organization');
+add('finance', ['person_identity','person_financial'], read, 'organization');
+add('me-auditor', ['person_demographics'], read, 'organization');
+add('program-manager', ['person_emergency'], read, 'organization');
+add('participant', ['person_identity','person_financial','person_demographics'], read, 'self');
+add('facilitator', ['person_demographics'], read, 'assigned');
 
 export const permissionGrants = grants;
 export interface PermissionContext { organizationId?: string; resourceOrganizationId?: string; assigned?: boolean; self?: boolean; coFunded?: boolean; }
 
 /** Permission decisions are data-driven. Scope context is supplied by the service/caller. */
-export function can(user: Pick<User, 'roleIds' | 'status' | 'organizationId'> | null | undefined, action: Action, resource: Resource, context: PermissionContext = {}): boolean {
+export function can(user: Pick<User, 'roleIds' | 'status' | 'organizationId'> & Partial<Pick<User,'workspaceAccess'>> | null | undefined, action: Action, resource: Resource, context: PermissionContext = {}): boolean {
   if (!user || user.status !== 'active') return false;
   const activeOrg = context.organizationId ?? user.organizationId ?? undefined;
   return user.roleIds.some((roleId) => permissionGrants.some((grant) => {
     if (grant.roleId !== roleId || grant.action !== action || grant.resource !== resource) return false;
     switch (grant.scope) {
-      case 'platform': return user.organizationId === null;
+      case 'platform': return user.organizationId === null || ('workspaceAccess' in user && user.workspaceAccess === true);
       case 'organization': return !!activeOrg && activeOrg === user.organizationId && (!context.resourceOrganizationId || context.resourceOrganizationId === activeOrg);
       case 'assigned': return !!context.assigned && (!context.resourceOrganizationId || context.resourceOrganizationId === user.organizationId);
       case 'self': return !!context.self;
@@ -61,4 +71,19 @@ export function can(user: Pick<User, 'roleIds' | 'status' | 'organizationId'> | 
       default: return false;
     }
   }));
+}
+
+/** Central field-level policy for person records. Public profile fields stay available; sensitive groups require explicit grants. */
+export function visibleFields(viewer:Pick<User,'roleIds'|'status'|'organizationId'>|null|undefined,target:Pick<User,'id'|'organizationId'|'roleIds'>):string[]{
+ const self=!!viewer&&'id' in viewer&&viewer.id===target.id;
+ const ctx={organizationId:viewer?.organizationId||undefined,resourceOrganizationId:target.organizationId||undefined,self};
+ const fields=['name','photoUrl','organization','roles','trainingHistory'];
+ if(self||can(viewer,'view','users',ctx)){fields.push('email','phone','professional','education','training','consent','engagement','organization','roles','status');}
+ if(self||can(viewer,'view','person_identity',ctx))fields.push('nationalId','passportNumber');
+ if(self||can(viewer,'view','person_demographics',ctx))fields.push('demographics');
+ if(self||can(viewer,'view','person_financial',ctx))fields.push('financial');
+ if(can(viewer,'view','person_emergency',ctx))fields.push('emergencyContact');
+ if(target.roleIds.includes('facilitator')&&can(viewer,'view','facilitators',ctx))fields.push('facilitatorExtension');
+ if(target.roleIds.some(r=>['org-admin','program-manager','finance','me-auditor'].includes(r))&&can(viewer,'view','users',ctx))fields.push('staffExtension');
+ return [...new Set(fields)];
 }

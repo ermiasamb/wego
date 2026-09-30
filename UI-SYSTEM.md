@@ -7,7 +7,9 @@
 - `Button`: primary, secondary, quiet, and dark variants; lift/shadow hover, pressed compression, disabled/loading affordance.
 - `Link`: SPA deep-link navigation with shared animated text-link affordance.
 - `Card` / `Panel`: reusable card and dashboard surfaces with elevation and consistent radius.
-- `Badge`: neutral, success, and accent state indicator.
+- `Badge` / `StatusBadge`: one shared status treatment for account and business-record states.
+- `PermissionMatrix`: reusable module-by-action checkbox grid used by role administration.
+- `visibleFields()`: field-level authorization helper for person-account projections.
 - `Share`: canonical URL copy action, clipboard fallback, confirmation micro-interaction; used by public events, stories, and certificates.
 - `PageHeading`, `Metric`, `Empty`, `SkeletonDashboard`, `Notice`: shared page framing, KPI, empty, loading, and feedback states.
 - `table-scroll` table pattern: responsive scroll wrapper, consistent headers, rows, participant identity, status badges.

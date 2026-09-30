@@ -6,7 +6,7 @@
 - Keep every tenant-owned business record scoped with `organizationId`. Tenant filtering belongs in the service layer; only a platform-level permission can request cross-tenant data.
 
 ## Mock-data-driven RBAC
-Roles and permissions are records in the mock data layer, not role-name conditionals in components. Example:
+Roles and permissions are records in the mock data layer, not role-name conditionals in components. Role administrators use the same `roles` and `permissionGrants` arrays as `can()`. The shared `PermissionMatrix` component edits those grant records; built-in roles remain locked and account-role mutations must be tenant-authorized. Use `visibleFields()` for person-profile fields and `can()` for every profile tab. Example:
 
 ```ts
 export function can(user: User, action: Action, resource: Resource, context?: Scope) {
@@ -37,3 +37,10 @@ Events and certificates use one shared `Share` component/utility contract: accep
 - Does it use design tokens for all visual values?
 - Does it have loading, empty, and error states from the mock service layer?
 - Are public share links canonical and handled by the shared Share contract?
+
+## Person profiles, derived metrics, and sensitive data
+- Keep one composed `User`/Person entity for all roles. Role-specific sections are optional fields on that same record; never introduce parallel facilitator/staff/participant person models.
+- Use `visibleFields(viewer, targetPerson)` from the permission layer everywhere person fields are presented or exported. Sensitive field groups must not be gated with local role-name conditionals.
+- Organization `demographicCollection.collect*` records are the source of truth for whether demographic fields are collected. Forms and services both enforce the settings.
+- Compute training history, CPD totals, engagement, facilitator performance, and completeness from related mock records via `mock-data/person-profile.ts`; do not store cached/static derived metrics on User.
+- Store privacy and photo/media consent separately. A public gallery must filter or reject photos without explicit consent for everyone pictured.

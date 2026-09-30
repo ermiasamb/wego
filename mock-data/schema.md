@@ -3,8 +3,8 @@
 All IDs are stable strings. Dates are ISO-8601. Money is stored as integer minor units plus ISO currency code (never floating-point). Every tenant-owned entity includes `organizationId`; cross-entity references are IDs. Services enforce tenant scoping.
 
 ## Identity, access, tenancy
-- **Organization**: `id, name, slug, type (ngo|government|private), description, logoUrl, brand (primaryColor, accentColor), country, timezone, currency, status, createdAt`.
-- **User**: `id, name, email, passwordHash (demo-only), organizationId|null, roleIds[], avatarUrl, status (active|invited|suspended), lastLoginAt?`. Null organization is reserved for platform-level accounts.
+- **Organization**: `id, name, slug, type (ngo|government|private), description, logoUrl, brand (primaryColor, accentColor), country, timezone, currency, demographicCollection (collect* flags), status, createdAt`.
+- **Person/User (single composed record)**: account identity plus optional identity/contact, address/emergency, professional, education/language, configurable demographic, learning preferences, finance, facilitator extension, organization-staff extension, consent, and account-engagement fields. Every role uses this same record; optional extensions exist only when applicable. National ID/passport, demographic, financial, and emergency fields are gated by the shared `visibleFields(viewer, targetPerson)` policy. Null organization is reserved for platform-level accounts.
 - **Role**: `id, name, description, scope (platform|organization|program|self), organizationId|null, builtIn, permissions[]`.
 - **Permission grant**: `roleId, resource, action (view|create|edit|delete|approve|export|publish|manage), scope (own|organization|assigned|co-funded|platform)`.
 - **Session**: `token, userId, issuedAt, expiresAt`; local persistence only, never a real credential.
@@ -16,7 +16,7 @@ All IDs are stable strings. Dates are ISO-8601. Money is stored as integer minor
 - **Session**: `id, organizationId, cohortId, title, startsAt, endsAt, facilitatorIds[], venueId?, objectives[], materials[]`.
 - **Venue**: `id, organizationId, name, address, capacity, virtual, notes`.
 - **Participant/enrollment**: participant is a User record; `Enrollment: id, organizationId, programId, cohortId, participantId, status (enrolled|waitlisted|completed|withdrawn), enrolledAt`.
-- **Facilitator profile**: `id, organizationId, userId, bio, expertiseTags[], qualifications[], availability`.
+- Facilitator expertise, bio, certifications, facilitation experience/rate, availability reference, and derived performance rating are fields on the same Person/User record; there is no parallel facilitator person entity.
 - **Attendance**: `id, organizationId, sessionId, participantId, state (present|late|absent|excused), recordedAt, recordedBy`.
 - **Assessment**: `id, organizationId, programId, cohortId, participantId, title, score, maxScore, passed, assessedAt`.
 - **Evaluation response**: `id, organizationId, programId, cohortId, participantId, rating, responses, submittedAt`.
@@ -27,10 +27,13 @@ All IDs are stable strings. Dates are ISO-8601. Money is stored as integer minor
 - Per diem records are participant/session-day based; trainer fees link facilitator and program/session; venue costs link venue/cohort/session; logistics and catering retain itemization in description/quantity/unit rate; stationery/equipment records retain item-level descriptions. Program budgets are on Program and actuals aggregate paid/approved expenses.
 
 ## Public content & engagement
-- **Blog post/outcome**: `id, organizationId, programId?, cohortId?, title, body, coverImageUrl?, galleryUrls[], authorId, status (draft|published), publishedAt?, tags[], publicSlug`.
+- **Blog post/outcome**: `id, organizationId, programId?, cohortId?, title, body, coverImageUrl?, galleryUrls[], galleryConsentUserIds[], authorId, status (draft|published), publishedAt?, tags[], publicSlug`. Cover and gallery images are returned only when each pictured person has explicit photo/media consent.
 - **Event**: `id, organizationId, programId?, cohortId?, title, description, imageUrl?, startsAt, endsAt, venueId?, registrationUrl?, capacity?, status, public, publicSlug`.
 - **Notification**: `id, organizationId, userId, type, title, body, createdAt, readAt?, relatedEntityType?, relatedEntityId?`.
 - **Activity/audit record**: `id, organizationId, actorId, action, entityType, entityId, occurredAt, metadata`.
+
+## Person derivations and privacy
+`trainingHistory`, CPD totals, engagement score, facilitator performance rating, and profile completeness are computed by `mock-data/person-profile.ts` from enrollments, attendance, sessions, evaluations, and available profile values; they are not persisted on Person. Organization demographic collection toggles drive both registration and profile forms. Do not collect fields when the relevant `collect*` setting is off. Registration requires data-privacy consent; photo/media consent is an independent opt-in.
 
 ## Relationships and integrity
 Program owns cohorts/modules; cohort owns sessions and enrollments; attendance and assessment reference session/cohort and participant; certificates reference participant + program (+ cohort); all finance records link to a program and optionally finer-grained delivery records. Public slugs are globally unique. Public endpoints return an explicit safe projection, never internal user, finance, or permission fields.

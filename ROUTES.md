@@ -24,6 +24,7 @@ One router and one shared shell; role and tenant visibility derive from mock per
 - `/app/certificates` — eligibility, issuing, revocation, QR and sharing
 - `/app/reports` — shared analytics and exports
 - `/app/notifications` — notification center
-- `/app/settings` — tenant branding, user invitations and custom roles (permission-gated)
+- `/app/settings` — tenant branding and workspace settings (permission-gated)
+- `/app/roles` — role directory, reusable permission matrix, role duplication, and safe reassignment on deletion (Platform Super Admin / Organization Admin)
 
 Unknown paths render a shared not-found state. Public and authenticated routes share cards, tables, status badges, share controls, and loading/error primitives; no role-specific directory or app tree is introduced.
